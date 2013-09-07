@@ -1,5 +1,5 @@
 This is an SBT plugin that provides an interface to the JOOQ code generation tool
-(<http://www.jooq.org>). The plugin is compatible with SBT 0.11.3 and Scala 2.9.1+.
+(<http://www.jooq.org>). The plugin is compatible with SBT 0.11.3+ and Scala 2.9.1+.
 
 The current version of the plugin is *1.0*
 
@@ -10,7 +10,7 @@ Quick Start
 1. Add jooq-sbt-plugin to your `project/plugins.sbt`:
         
         resolvers += "sean8223 Releases" at "https://github.com/sean8223/repository/raw/master/releases"
-        addSbtPlugin("sean8223" %% "flyway-sbt-plugin" % CURRENT_PLUGIN_VERSION) // see above
+        addSbtPlugin("sean8223" %% "jooq-sbt-plugin" % CURRENT_PLUGIN_VERSION) // see above
 		
 2. In your `build.sbt`, do the following:
 
