@@ -40,8 +40,10 @@ object JOOQPlugin extends Plugin {
   
   val jooqSettings = inConfig(JOOQ)(Seq(
 
-    managedClasspath <<= (classpathTypes, update) map { (ct, u) =>
-      Classpaths.managedJars(JOOQ, ct, u)
+    // add unmanaged jars to the JOOQ classpath to support proprietary
+    // drivers (e.g. Oracle) that aren't available via Ivy/Maven
+    managedClasspath <<= (classpathTypes, update, unmanagedJars in Compile) map { (ct, u, uj) =>
+      Classpaths.managedJars(JOOQ, ct, u) ++ uj
     },
 
     codegen <<= (streams,
