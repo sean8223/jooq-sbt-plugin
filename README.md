@@ -85,6 +85,53 @@ The plugin also attaches to the `compile:compile` task (by way of
 you run `clean`).
 
 
+Generating Code for Multiple Databases
+======================================
+
+It is possible to generate code for multiple databases, although it requires a
+more complicated project structure. You'll need to follow the guidelines for 
+setting up a [multi-project SBT build.](http://www.scala-sbt.org/release/docs/Getting-Started/Multi-Project.html)
+
+For example, consider the following project structure, that defines three modules:
+common code, and JOOQ code generated for two different database types (e.g. Oracle
+and MySQL):
+
+    myproject/
+        project/
+	        plugins.sbt
+            MyProject.scala
+        myproject-jooq-oracle/
+	        build.sbt
+        myproject-jooq-mysql/
+            build.sbt
+        myproject-common/
+            build.sbt
+
+To accomplish this:
+
+1. At the root of your project, create the standard `project` directory and place
+   a `plugins.sbt` (as described in Quick Start) and a Scala-based build definition
+   (named `MyProject.scala` in this example).
+   
+2. In `MyProject.scala`, define a root project that aggregates the three subprojects.
+   For example:
+
+        object MyProject extends Build {
+            lazy val root = project.in(file(".")) aggregate(myProjectJooqOracle, myProjectJooqMySQL, myProjectCommon)
+            lazy val myProjectJooqOracle = project in file ("jooq-oracle")
+            lazy val myProjectJooqMySQL = project in file ("jooq-mysql")
+            lazy val myProjectCommon = project.in(file("common")).dependsOn(myProjectJooqOracle, myProjectJooqMySQL)
+        }
+
+3. In the `build.sbt` in each of the JOOQ sub-modules, vary the properties as needed to 
+   generate code for that database type. Each sub-module will have its own `jooqOptions`
+   that you can use to control how the code is generated. You will also specify
+   the required database drivers in that module's `libraryDependencies` with
+   `jooq` scope as above.
+
+Refer to the SBT documentation for more thorough examples of multi-project build files.
+
+
 History
 =======
 
