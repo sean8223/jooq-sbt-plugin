@@ -1,7 +1,7 @@
 This is an SBT plugin that provides an interface to the JOOQ code generation tool
 (<http://www.jooq.org>). The plugin is compatible with SBT 0.11.3+ and Scala 2.9.1+.
 
-The current version of the plugin is *1.2*
+The current version of the plugin is *1.3*
 
 
 Quick Start
@@ -64,7 +64,8 @@ The plugin exposes several settings:
 
 * *jooq-version* (`jooqVersion` in build.sbt): a `String` indicating the version
   of JOOQ to use. The JOOQ libraries at this version will also be imported into your
-  project's compile scope.
+  project's compile scope. The default value is *3.2.1*, but the plugin is known
+  to work with the 2.x series of JOOQ as well (e.g. 2.6.1).
 
 * *jooq-log-level* (`jooqLogLevel` in build.sbt): a `String` controlling the
   the verbosity of code generator's logging. It defaults to "info", which 
@@ -138,3 +139,4 @@ History
 * 1.0: Initial release
 * 1.1: Fixed error in which `jooqOutputDirectory` was incorrectly being set to `sourceManaged` rather than `sourceManaged in Compile`
 * 1.2: Added `unmanagedJars in Compile` to the `managedClasspath` used by the plugin to facilitate use of proprietary drivers that might not be accessible via Ivy/Maven repos.
+* 1.3: Changed default JOOQ version to 3.2.1 (previous default was 2.6.1)
