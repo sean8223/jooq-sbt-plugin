@@ -59,7 +59,7 @@ object JOOQPlugin extends Plugin {
 
   )) ++ Seq(
 
-    jooqVersion := "3.2.1",
+    jooqVersion := "3.3.1",
 
     jooqOptions := Seq(),
 
