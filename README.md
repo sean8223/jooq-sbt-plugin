@@ -85,6 +85,14 @@ The plugin also attaches to the `compile:compile` task (by way of
 `*.java` files in the directory indicated by `jooq-output-directory` (e.g. if
 you run `clean`).
 
+If you are using JOOQ in conjunction with other plugins (e.g. [flyway-sbt-plugin](http://github.com/sean8223/flyway-sbt-plugin))
+and need to force the codegen task to run before other tasks (e.g. `flyway:migrate`), you
+can use SBT's `<<=` operator to establish dependencies between them. For example:
+
+    (migrate in Flyway) <<= (codegen in JOOQ)
+
+Add this to your `build.sbt` file after you have imported and configured `jooqSettings`.
+
 
 Generating Code for Multiple Databases
 ======================================
