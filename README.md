@@ -1,7 +1,7 @@
 This is an SBT plugin that provides an interface to the JOOQ code generation tool
 (<http://www.jooq.org>). The plugin is compatible with SBT 0.11.3+ and Scala 2.9.1+.
 
-The current version of the plugin is *1.4*
+The current version of the plugin is *1.5*
 
 
 Quick Start
@@ -55,6 +55,13 @@ The plugin exposes several settings:
 
   Refer to <http://www.jooq.org/doc/3.0/manual/code-generation/codegen-configuration/>
   for a complete description of JOOQ's configuration options. 
+
+* *jooq-config-file*: an `Option[File]` that allows you to supply a
+  specific JOOQ XML configuration file to the plugin. Set it like this:
+
+            jooqConfigFile := Some(new java.io.File("/path/to/your/file")
+
+   This will override the `jooq-options` setting if present. 
 
 * *jooq-output-directory* (`jooqOutputDirectory` in build.sbt): a `File`
   indicating where JOOQ should deposit the source files it generates. By
@@ -149,3 +156,4 @@ History
 * 1.2: Added `unmanagedJars in Compile` to the `managedClasspath` used by the plugin to facilitate use of proprietary drivers that might not be accessible via Ivy/Maven repos.
 * 1.3: Changed default JOOQ version to 3.2.1 (previous default was 2.6.1)
 * 1.4: Changed default JOOQ version to 3.3.1 (previous default was 3.2.1)
+* 1.5: Added `jooqConfigFile` option to allow for handcrafted JOOQ configurations beyond what can be specified in `jooqOptions`

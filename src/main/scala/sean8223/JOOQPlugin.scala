@@ -36,6 +36,8 @@ object JOOQPlugin extends Plugin {
 
   val jooqOutputDirectory = SettingKey[File]("jooq-output-directory", "JOOQ output directory.")
 
+  val jooqConfigFile = SettingKey[Option[File]]("jooq-config-file", "Specific config file to use in lieu of jooq-options")
+
   // exported keys
   
   val jooqSettings = inConfig(JOOQ)(Seq(
@@ -51,9 +53,10 @@ object JOOQPlugin extends Plugin {
 		 managedClasspath in JOOQ,
 		 jooqOutputDirectory,
 		 jooqOptions,
-		 jooqLogLevel) map {
-      (s, bd, mcp, od, o, ll) => {
-	executeJooqCodegen(s.log, bd, mcp, od, o, ll)
+		 jooqLogLevel,
+		 jooqConfigFile) map {
+      (s, bd, mcp, od, o, ll, cf) => {
+	executeJooqCodegen(s.log, bd, mcp, od, o, ll, cf)
       }
     }
 
@@ -66,15 +69,18 @@ object JOOQPlugin extends Plugin {
     jooqLogLevel := "info",
 
     jooqOutputDirectory <<= (sourceManaged in Compile)( _ / "java"),
+
+    jooqConfigFile := None,
     
     sourceGenerators in Compile <+= (streams, 
 				     baseDirectory, 
 				     managedClasspath in JOOQ, 
 				     jooqOutputDirectory,
 				     jooqOptions,
-				     jooqLogLevel) map { 
-      (s, bd, mcp, od, o, ll) => {
-	executeJooqCodegenIfOutOfDate(s.log, bd, mcp, od, o, ll) 
+				     jooqLogLevel,
+				     jooqConfigFile) map { 
+      (s, bd, mcp, od, o, ll, cf) => {
+	executeJooqCodegenIfOutOfDate(s.log, bd, mcp, od, o, ll, cf) 
       }
     },
 
@@ -95,6 +101,10 @@ object JOOQPlugin extends Plugin {
     
   )
   
+  private def getOrGenerateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]], jooqConfigFile:Option[File]) = {
+    jooqConfigFile.getOrElse(generateJooqConfig(log, outputDirectory, options))
+  } 
+
   private def generateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]]) = {
     val tmp = File.createTempFile("jooq-config", ".xml")
     tmp.deleteOnExit
@@ -172,19 +182,20 @@ object JOOQPlugin extends Plugin {
     cp
   }
 
-  private def executeJooqCodegenIfOutOfDate(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String) = {
+  private def executeJooqCodegenIfOutOfDate(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File]) = {
     // lame way of detecting whether or not code is out of date, user can always
     // run jooq:codegen manually to force regeneration
     val files = (outputDirectory ** "*.java").get
-    if (files.isEmpty) executeJooqCodegen(log, baseDirectory, managedClasspath, outputDirectory, options, logLevel)
+    if (files.isEmpty) executeJooqCodegen(log, baseDirectory, managedClasspath, outputDirectory, options, logLevel, jooqConfigFile)
     else files
   }
 
-  private def executeJooqCodegen(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String) = {
-    val jooqConfigFile = generateJooqConfig(log, outputDirectory, options)
+  private def executeJooqCodegen(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File]) = {
+    val jcf = getOrGenerateJooqConfig(log, outputDirectory, options, jooqConfigFile)
+    log.debug("Using jooq config " + jcf)
     val log4jConfig = generateLog4jConfig(log, logLevel)
-    val classpathArgument = generateClasspathArgument(log, managedClasspath, jooqConfigFile)
-    val cmdLine = Seq("java", "-classpath", classpathArgument, "-Dlog4j.configuration=" + log4jConfig.toURL, "org.jooq.util.GenerationTool", "/" + jooqConfigFile.getName())
+    val classpathArgument = generateClasspathArgument(log, managedClasspath, jcf)
+    val cmdLine = Seq("java", "-classpath", classpathArgument, "-Dlog4j.configuration=" + log4jConfig.toURL, "org.jooq.util.GenerationTool", "/" + jcf.getName())
     log.debug("Command line is " + cmdLine.mkString(" "))
     val rc = Process(cmdLine, baseDirectory) ! log
     rc match {
