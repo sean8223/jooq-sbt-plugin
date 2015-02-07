@@ -96,7 +96,7 @@ If you are using JOOQ in conjunction with other plugins (e.g. [flyway-sbt-plugin
 and need to force the codegen task to run before other tasks (e.g. `flyway:migrate`), you
 can use SBT's `<<=` operator to establish dependencies between them. For example:
 
-    (migrate in Flyway) <<= (codegen in JOOQ)
+    (codegen in JOOQ) <<= (migrate in Flyway)
 
 Add this to your `build.sbt` file after you have imported and configured `jooqSettings`.
 
