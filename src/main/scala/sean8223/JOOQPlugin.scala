@@ -32,6 +32,8 @@ object JOOQPlugin extends Plugin {
 
   val jooqVersion = SettingKey[String]("jooq-version", "JOOQ version.")
 
+  val sl4jVersion = SettingKey[String]("slf4j-version", "slf4j version.")
+
   val jooqLogLevel = SettingKey[String]("jooq-log-level", "JOOQ log level.")
 
   val jooqOutputDirectory = SettingKey[File]("jooq-output-directory", "JOOQ output directory.")
@@ -39,7 +41,7 @@ object JOOQPlugin extends Plugin {
   val jooqConfigFile = SettingKey[Option[File]]("jooq-config-file", "Specific config file to use in lieu of jooq-options")
 
   // exported keys
-  
+
   val jooqSettings = inConfig(JOOQ)(Seq(
 
     // add unmanaged jars to the JOOQ classpath to support proprietary
@@ -49,70 +51,72 @@ object JOOQPlugin extends Plugin {
     },
 
     codegen <<= (streams,
-		 baseDirectory,
-		 managedClasspath in JOOQ,
-		 jooqOutputDirectory,
-		 jooqOptions,
-		 jooqLogLevel,
-		 jooqConfigFile) map {
+      baseDirectory,
+      managedClasspath in JOOQ,
+      jooqOutputDirectory,
+      jooqOptions,
+      jooqLogLevel,
+      jooqConfigFile) map {
       (s, bd, mcp, od, o, ll, cf) => {
-	executeJooqCodegen(s.log, bd, mcp, od, o, ll, cf)
+        executeJooqCodegen(s.log, bd, mcp, od, o, ll, cf)
       }
     }
 
   )) ++ Seq(
 
-    jooqVersion := "3.3.1",
+    jooqVersion := "3.5.3",
+
+    sl4jVersion := "1.7.10",
 
     jooqOptions := Seq(),
 
     jooqLogLevel := "info",
 
-    jooqOutputDirectory <<= (sourceManaged in Compile)( _ / "java"),
+    jooqOutputDirectory <<= (sourceManaged in Compile)(_ / "java"),
 
     jooqConfigFile := None,
-    
-    sourceGenerators in Compile <+= (streams, 
-				     baseDirectory, 
-				     managedClasspath in JOOQ, 
-				     jooqOutputDirectory,
-				     jooqOptions,
-				     jooqLogLevel,
-				     jooqConfigFile) map { 
+
+    sourceGenerators in Compile <+= (streams,
+      baseDirectory,
+      managedClasspath in JOOQ,
+      jooqOutputDirectory,
+      jooqOptions,
+      jooqLogLevel,
+      jooqConfigFile) map {
       (s, bd, mcp, od, o, ll, cf) => {
-	executeJooqCodegenIfOutOfDate(s.log, bd, mcp, od, o, ll, cf) 
+        executeJooqCodegenIfOutOfDate(s.log, bd, mcp, od, o, ll, cf)
       }
     },
 
-    libraryDependencies <++= (scalaVersion, jooqVersion) apply {
-      (sv, jv) => { 
-	Seq("org.jooq" % "jooq" % jv % JOOQ.name,
-	    "org.jooq" % "jooq" % jv, // also add this to the project's compile configuration
-	    "org.jooq" % "jooq-meta" % jv % JOOQ.name,
-	    "org.jooq" % "jooq-codegen" % jv % JOOQ.name,
-	    "org.slf4j" % "slf4j-api" % "1.7.2" % JOOQ.name,
-	    "org.slf4j" % "slf4j-log4j12" % "1.7.2" % JOOQ.name,
-	    "org.slf4j" % "jul-to-slf4j" % "1.7.2" % JOOQ.name,
-	    "log4j" % "log4j" % "1.2.17" % JOOQ.name)
+    libraryDependencies <++= (scalaVersion, jooqVersion, sl4jVersion) apply {
+      (sv, jv, sl4jv) => {
+        Seq("org.jooq" % "jooq" % jv % JOOQ.name,
+          "org.jooq" % "jooq" % jv, // also add this to the project's compile configuration
+          "org.jooq" % "jooq-meta" % jv % JOOQ.name,
+          "org.jooq" % "jooq-codegen" % jv % JOOQ.name,
+          "org.slf4j" % "slf4j-api" % sl4jv % JOOQ.name,
+          "org.slf4j" % "slf4j-log4j12" % sl4jv % JOOQ.name,
+          "org.slf4j" % "jul-to-slf4j" % sl4jv % JOOQ.name,
+          "log4j" % "log4j" % "1.2.17" % JOOQ.name)
       }
     },
 
     ivyConfigurations += JOOQ
-    
-  )
-  
-  private def getOrGenerateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]], jooqConfigFile:Option[File]) = {
-    jooqConfigFile.getOrElse(generateJooqConfig(log, outputDirectory, options))
-  } 
 
-  private def generateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]]) = {
+  )
+
+  private def getOrGenerateJooqConfig(log: Logger, outputDirectory: File, options: Seq[Tuple2[String, String]], jooqConfigFile: Option[File]) = {
+    jooqConfigFile.getOrElse(generateJooqConfig(log, outputDirectory, options))
+  }
+
+  private def generateJooqConfig(log: Logger, outputDirectory: File, options: Seq[Tuple2[String, String]]) = {
     val tmp = File.createTempFile("jooq-config", ".xml")
     tmp.deleteOnExit
     val fw = new FileWriter(tmp)
     try {
-      val replaced = Seq("generator.target.directory" -> outputDirectory.getAbsolutePath) ++ options.filter { kv => kv._1 != "generator.target.directory" } 
-      val xml = replaced.foldLeft(<configuration/>) { 
-	(xml, kv) => xmlify(kv._1.split("\\."), kv._2, xml) 
+      val replaced = Seq("generator.target.directory" -> outputDirectory.getAbsolutePath) ++ options.filter { kv => kv._1 != "generator.target.directory" }
+      val xml = replaced.foldLeft(<configuration/>) {
+        (xml, kv) => xmlify(kv._1.split("\\."), kv._2, xml)
       }
       XML.save(tmp.getAbsolutePath, xml, "UTF-8", true)
     }
@@ -122,67 +126,71 @@ object JOOQPlugin extends Plugin {
     log.debug("Wrote JOOQ configuration to " + tmp.getAbsolutePath)
     tmp
   }
-  
-  private def xmlify(key:Seq[String], value:String, parent:Elem):Elem = {
+
+  private def xmlify(key: Seq[String], value: String, parent: Elem): Elem = {
     // convert a sequence of strings representing a XML path into a sequence
     // of nodes, and merge it in to the specified parent, reusing any nodes
     // that already exist, e.g. "value" at Seq("foo", "bar", "baz") becomes 
     // <foo><bar><baz>value</baz></bar></foo>
     key match {
-      case Seq(first) => Elem(null, parent.label, Null, TopScope, parent.child ++ Elem(null, first, Null, TopScope, Text(value)):_*)
-      case Seq(first, rest @ _*) => {
-	val (pre, post) = parent.child.span { _.label != first }
-	post match {
-	  case Nil => xmlify(key, value, Elem(null, parent.label, Null, TopScope, parent.child ++ Elem(null, first, Null, TopScope):_*))
-	  case _   => Elem(null, parent.label, Null, TopScope, pre ++ xmlify(rest, value, Elem(null, post.head.label, Null, TopScope, post.head.child:_*)) ++ post.tail:_*)
-	}
+      case Seq(first) => Elem(null, parent.label, Null, TopScope, parent.child ++ Elem(null, first, Null, TopScope, Text(value)): _*)
+      case Seq(first, rest@_*) => {
+        val (pre, post) = parent.child.span {
+          _.label != first
+        }
+        post match {
+          case Nil => xmlify(key, value, Elem(null, parent.label, Null, TopScope, parent.child ++ Elem(null, first, Null, TopScope): _*))
+          case _ => Elem(null, parent.label, Null, TopScope, pre ++ xmlify(rest, value, Elem(null, post.head.label, Null, TopScope, post.head.child: _*)) ++ post.tail: _*)
+        }
       }
     }
   }
 
-  private def generateLog4jConfig(log:Logger, logLevel:String) = {
+  private def generateLog4jConfig(log: Logger, logLevel: String) = {
     // shunt any messages at warn and higher to stderr, everything else to
     // stdout, thanks to http://stackoverflow.com/questions/8489551/logging-error-to-stderr-and-debug-info-to-stdout-with-log4j
     val tmp = File.createTempFile("log4j", ".xml")
     tmp.deleteOnExit
     val configuration =
       <log4j:configuration>
-    <appender name="stderr" class="org.apache.log4j.ConsoleAppender">
-    <param name="threshold" value="warn" />
-    <param name="target" value="System.err"/>
-    <layout class="org.apache.log4j.PatternLayout">
-    <param name="ConversionPattern" value="%m%n" />
-    </layout>
-    </appender>
-    <appender name="stdout" class="org.apache.log4j.ConsoleAppender">
-    <param name="threshold" value="debug" />
-    <param name="target" value="System.out"/>
-    <layout class="org.apache.log4j.PatternLayout">
-    <param name="ConversionPattern" value="%m%n" />
-    </layout>
-    <filter class="org.apache.log4j.varia.LevelRangeFilter">
-    <param name="LevelMin" value="debug" />
-    <param name="LevelMax" value="info" />
-    </filter>
-    </appender>
-    <root>
-    <priority value={logLevel}></priority>
-    <appender-ref ref="stderr" />
-    <appender-ref ref="stdout" />
-    </root>
-    </log4j:configuration>
+        <appender name="stderr" class="org.apache.log4j.ConsoleAppender">
+          <param name="threshold" value="warn"/>
+          <param name="target" value="System.err"/>
+          <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%m%n"/>
+          </layout>
+        </appender>
+        <appender name="stdout" class="org.apache.log4j.ConsoleAppender">
+          <param name="threshold" value="debug"/>
+          <param name="target" value="System.out"/>
+          <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%m%n"/>
+          </layout>
+          <filter class="org.apache.log4j.varia.LevelRangeFilter">
+            <param name="LevelMin" value="debug"/>
+            <param name="LevelMax" value="info"/>
+          </filter>
+        </appender>
+        <root>
+          <priority value={logLevel}></priority>
+          <appender-ref ref="stderr"/>
+          <appender-ref ref="stdout"/>
+        </root>
+      </log4j:configuration>
     XML.save(tmp.getAbsolutePath, configuration, "UTF-8", true, DocType("log4j:configuration", SystemID("log4j.dtd"), Nil))
     log.debug("Wrote log4j configuration to " + tmp.getAbsolutePath)
     tmp
   }
 
-  private def generateClasspathArgument(log:Logger, classpath:Seq[Attributed[File]], jooqConfigFile:File) = {
-    val cp = (classpath.map { _.data.getAbsolutePath } :+ jooqConfigFile.getParentFile.getAbsolutePath).mkString(System.getProperty("path.separator")) 
+  private def generateClasspathArgument(log: Logger, classpath: Seq[Attributed[File]], jooqConfigFile: File) = {
+    val cp = (classpath.map {
+      _.data.getAbsolutePath
+    } :+ jooqConfigFile.getParentFile.getAbsolutePath).mkString(System.getProperty("path.separator"))
     log.debug("Classpath is " + cp)
     cp
   }
 
-  private def executeJooqCodegenIfOutOfDate(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File]) = {
+  private def executeJooqCodegenIfOutOfDate(log: Logger, baseDirectory: File, managedClasspath: Seq[Attributed[File]], outputDirectory: File, options: Seq[Tuple2[String, String]], logLevel: String, jooqConfigFile: Option[File]) = {
     // lame way of detecting whether or not code is out of date, user can always
     // run jooq:codegen manually to force regeneration
     val files = (outputDirectory ** "*.java").get
@@ -190,7 +198,7 @@ object JOOQPlugin extends Plugin {
     else files
   }
 
-  private def executeJooqCodegen(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File]) = {
+  private def executeJooqCodegen(log: Logger, baseDirectory: File, managedClasspath: Seq[Attributed[File]], outputDirectory: File, options: Seq[Tuple2[String, String]], logLevel: String, jooqConfigFile: Option[File]) = {
     val jcf = getOrGenerateJooqConfig(log, outputDirectory, options, jooqConfigFile)
     log.debug("Using jooq config " + jcf)
     val log4jConfig = generateLog4jConfig(log, logLevel)
