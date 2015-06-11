@@ -9,8 +9,9 @@ Quick Start
 
 1. Add jooq-sbt-plugin to your `project/plugins.sbt`:
         
-        resolvers += "sean8223 Releases" at "https://github.com/sean8223/repository/raw/master/releases"
-        addSbtPlugin("sean8223" %% "jooq-sbt-plugin" % CURRENT_PLUGIN_VERSION) // see above
+resolvers += "repo" at "https://github.com/hepin1989/release-repo/raw/master"
+
+addSbtPlugin("sean8223" %% "jooq-sbt-plugin" % "1.6.0") // see above
 		
 2. In your `build.sbt`, do the following:
 
@@ -40,7 +41,7 @@ Settings
 ========
 
 The plugin exposes several settings:
-
+@deleted at version 1.6.0 ,using multiplyJooqOptions
 * *jooq-options* (`jooqOptions` in build.sbt): a `Seq[Tuple2[String, String]]`
   containing configuration properties for the JOOQ code generator. These will 
   be transformed into paths into the XML configuration file; for example, the option
@@ -147,6 +148,38 @@ To accomplish this:
 
 Refer to the SBT documentation for more thorough examples of multi-project build files.
 
+//first added with version 1.6.0
+4. support multiply jooq option
+val game1:Seq[(String,String)] = Seq("jdbc.driver" -> "com.mysql.jdbc.Driver",
+  "jdbc.url" -> "jdbc:mysql://192.168.0.123:3306/heros_game1",
+  "jdbc.user" -> "root",
+  "jdbc.password" -> "root",
+  "generator.database.name" -> "org.jooq.util.mysql.MySQLDatabase",
+  "generator.database.inputSchema" -> "heros_game1",
+  "generator.target.packageName" -> "cn.qgame.db.jooq.entities.game",
+  "generator.generate.pojos" -> "true",
+  "generator.generate.immutablePojos" -> "false",
+  "generator.strategy.name" -> "qgame.jooq.DBGeneratorStrategy",
+  "generator.name" -> "qgame.jooq.DBGenerator",
+  "generator.database.outputSchemaToDefault" -> "true")
+
+val user:Seq[(String,String)] =  Seq("jdbc.driver" -> "com.mysql.jdbc.Driver",
+  "jdbc.url" -> "jdbc:mysql://192.168.0.123:3306/heros_user",
+  "jdbc.user" -> "root",
+  "jdbc.password" -> "root",
+  "generator.database.name" -> "org.jooq.util.mysql.MySQLDatabase",
+  "generator.database.inputSchema" -> "heros_user",
+  "generator.target.packageName" -> "cn.qgame.db.jooq.entities.user",
+  "generator.generate.pojos" -> "true",
+  "generator.generate.immutablePojos" -> "false",
+  "generator.strategy.name" -> "qgame.jooq.DBGeneratorStrategy",
+  "generator.name" -> "qgame.jooq.DBGenerator",
+  "generator.database.outputSchemaToDefault" -> "true")
+
+multiplyJooqOptions := Map("game"-> game1,"user"->user)
+
+5. support jooqForceGen to ignore the file is exist.
+jooqForceGen := true
 
 History
 =======
@@ -157,3 +190,4 @@ History
 * 1.3: Changed default JOOQ version to 3.2.1 (previous default was 2.6.1)
 * 1.4: Changed default JOOQ version to 3.3.1 (previous default was 3.2.1)
 * 1.5: Added `jooqConfigFile` option to allow for handcrafted JOOQ configurations beyond what can be specified in `jooqOptions`
+* 1.6: add `multiplyJooqOptions` and `jooqForceGen`,delete `jooqOptions`
