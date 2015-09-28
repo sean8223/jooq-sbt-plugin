@@ -61,7 +61,22 @@ The plugin exposes several settings:
 
             jooqConfigFile := Some(new java.io.File("/path/to/your/file")
 
-   This will override the `jooq-options` setting if present. 
+   This will override the `jooq-options` setting if present. This file now allows for users to pass templatable values using the Java Minimal Template Engine. Refer to <https://code.google.com/p/jmte/> for a complete description of how to use JMTE. 
+   
+* *jooq-config-template-values*: an `Option[()=>Map[String, AnyRef]]` that allows you to supply a specify a map of string keys and corresponding values to be sustituted into a specified jooqConfigFile. Set it like this:
+
+```scala
+jooqConfigTemplateValues := Some(() => {
+  val envFile = baseDirectory.value / ".env"
+  if (envFile.isFile){
+    IO.load(System.getProperties, envFile)
+  }
+
+  val conf = ConfigFactory.parseFile(new File("conf/development.conf")).resolve()
+
+  JavaConversions.mapAsScalaMap(conf.getObject("db.default").unwrapped()).toMap
+})
+```
 
 * *jooq-output-directory* (`jooqOutputDirectory` in build.sbt): a `File`
   indicating where JOOQ should deposit the source files it generates. By
