@@ -19,7 +19,6 @@ import scala.collection.JavaConversions
 import scala.xml.{XML, Elem, Null, TopScope, Text}
 import scala.xml.dtd.{DocType, SystemID}
 import com.floreysoft.jmte._
-import scala.io.Source
 
 object JOOQPlugin extends Plugin {
 
@@ -41,29 +40,24 @@ object JOOQPlugin extends Plugin {
 
   val jooqConfigFile = SettingKey[Option[File]]("jooq-config-file", "Specific config file to use in lieu of jooq-options")
 
-  val jooqConfigTemplateValues = SettingKey[Option[()=>Map[String, AnyRef]]]("jooq-config-template-values", "Values to be substituted in")
-
+  val jooqConfigTemplateValues = SettingKey[Option[()=>Map[String, AnyRef]]]("jooq-config-template-values", "Values to be substituted into config value if both are provided")
 
   // exported keys
   
   val jooqSettings = inConfig(JOOQ)(Seq(
 
-    // add unmanaged jars to the JOOQ classpath to support proprietary
-    // drivers (e.g. Oracle) that aren't available via Ivy/Maven
-    managedClasspath <<= (classpathTypes, update, unmanagedJars in Compile) map { (ct, u, uj) =>
-      Classpaths.managedJars(JOOQ, ct, u) ++ uj
-    },
+    dependencyClasspath in JOOQ <<= dependencyClasspath or (dependencyClasspath in Compile),
 
     codegen <<= (streams,
 		 baseDirectory,
-		 managedClasspath in JOOQ,
+		 dependencyClasspath in JOOQ,
 		 jooqOutputDirectory,
 		 jooqOptions,
 		 jooqLogLevel,
 		 jooqConfigFile,
      jooqConfigTemplateValues) map {
-      (s, bd, mcp, od, o, ll, cf, tv) => {
-	executeJooqCodegen(s.log, bd, mcp, od, o, ll, cf, tv)
+      (s, bd, cp, od, o, ll, cf, tv) => {
+	executeJooqCodegen(s.log, bd, cp, od, o, ll, cf, tv)
       }
     }
 
@@ -81,14 +75,14 @@ object JOOQPlugin extends Plugin {
     
     sourceGenerators in Compile <+= (streams, 
 				     baseDirectory, 
-				     managedClasspath in JOOQ, 
+				     dependencyClasspath in JOOQ,
 				     jooqOutputDirectory,
 				     jooqOptions,
 				     jooqLogLevel,
 				     jooqConfigFile,
              jooqConfigTemplateValues) map {
-      (s, bd, mcp, od, o, ll, cf, tv) => {
-	executeJooqCodegenIfOutOfDate(s.log, bd, mcp, od, o, ll, cf, tv)
+      (s, bd, cp, od, o, ll, cf, tv) => {
+	executeJooqCodegenIfOutOfDate(s.log, bd, cp, od, o, ll, cf, tv)
       }
     },
 
@@ -101,6 +95,7 @@ object JOOQPlugin extends Plugin {
 	    "org.slf4j" % "slf4j-api" % "1.7.2" % JOOQ.name,
 	    "org.slf4j" % "slf4j-log4j12" % "1.7.2" % JOOQ.name,
 	    "org.slf4j" % "jul-to-slf4j" % "1.7.2" % JOOQ.name,
+//      "triplec1988" % "jooq-custom-codegen" % "1.1.0" % JOOQ.name,
 	    "log4j" % "log4j" % "1.2.17" % JOOQ.name)
       }
     },
@@ -109,19 +104,16 @@ object JOOQPlugin extends Plugin {
     
   )
   
-  private def getOrGenerateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]], jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) = {
+  private def getOrGenerateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]], jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) : File = {
 
     (jooqConfigFile, templateValues) match {
       case (Some(template), Some(values)) => {
         val engine = new Engine
-        val renderedConfig = new File("renderedJooqConfig.xml")
+        val renderedConfig  = File.createTempFile("jooq-config", ".xml")
+        renderedConfig.deleteOnExit
         val writer = new PrintWriter(renderedConfig)
         val substitutions = JavaConversions.mapAsJavaMap(values.apply())
-
-        Source.fromFile(template).getLines().foreach( line => {
-          writer.write(engine.transform(line, substitutions))
-        })
-
+        writer.write(engine.transform(IO.read(template), substitutions))
         writer.close()
         renderedConfig
       }
@@ -129,7 +121,7 @@ object JOOQPlugin extends Plugin {
     }
   } 
 
-  private def generateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]]) = {
+  private def generateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]]) : File = {
     val tmp = File.createTempFile("jooq-config", ".xml")
     tmp.deleteOnExit
     val fw = new FileWriter(tmp)
@@ -201,24 +193,27 @@ object JOOQPlugin extends Plugin {
   }
 
   private def generateClasspathArgument(log:Logger, classpath:Seq[Attributed[File]], jooqConfigFile:File) = {
-    val cp = (classpath.map { _.data.getAbsolutePath } :+ jooqConfigFile.getParentFile.getAbsolutePath).mkString(System.getProperty("path.separator")) 
+    val parent = jooqConfigFile.getParentFile.getAbsolutePath
+    val cp = (classpath.map {
+      _.data.getAbsolutePath
+    } :+ parent).mkString(System.getProperty("path.separator"))
     log.debug("Classpath is " + cp)
     cp
   }
 
-  private def executeJooqCodegenIfOutOfDate(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) = {
+  private def executeJooqCodegenIfOutOfDate(log:Logger, baseDirectory:File, dependencyClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) = {
     // lame way of detecting whether or not code is out of date, user can always
     // run jooq:codegen manually to force regeneration
     val files = getOutputFiles(outputDirectory)
-    if (files.isEmpty) executeJooqCodegen(log, baseDirectory, managedClasspath, outputDirectory, options, logLevel, jooqConfigFile, templateValues)
+    if (files.isEmpty) executeJooqCodegen(log, baseDirectory, dependencyClasspath, outputDirectory, options, logLevel, jooqConfigFile, templateValues)
     else files
   }
 
-  private def executeJooqCodegen(log:Logger, baseDirectory:File, managedClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) = {
-    val jcf = getOrGenerateJooqConfig(log, outputDirectory, options, jooqConfigFile, templateValues)
+  private def executeJooqCodegen(log:Logger, baseDirectory:File, dependencyClasspath:Seq[Attributed[File]], outputDirectory:File, options:Seq[Tuple2[String, String]], logLevel:String, jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) = {
+    val jcf : File = getOrGenerateJooqConfig(log, outputDirectory, options, jooqConfigFile, templateValues)
     log.debug("Using jooq config " + jcf)
     val log4jConfig = generateLog4jConfig(log, logLevel)
-    val classpathArgument = generateClasspathArgument(log, managedClasspath, jcf)
+    val classpathArgument = generateClasspathArgument(log, dependencyClasspath, jcf)
     val cmdLine = Seq("java", "-classpath", classpathArgument, "-Dlog4j.configuration=" + log4jConfig.toURL, "org.jooq.util.GenerationTool", "/" + jcf.getName())
     log.debug("Command line is " + cmdLine.mkString(" "))
     val rc = Process(cmdLine, baseDirectory) ! log
