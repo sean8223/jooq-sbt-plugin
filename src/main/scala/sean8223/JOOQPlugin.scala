@@ -72,6 +72,8 @@ object JOOQPlugin extends Plugin {
     jooqOutputDirectory <<= (sourceManaged in Compile)( _ / "java"),
 
     jooqConfigFile := None,
+
+    jooqConfigTemplateValues := None,
     
     sourceGenerators in Compile <+= (streams, 
 				     baseDirectory, 
@@ -95,7 +97,6 @@ object JOOQPlugin extends Plugin {
 	    "org.slf4j" % "slf4j-api" % "1.7.2" % JOOQ.name,
 	    "org.slf4j" % "slf4j-log4j12" % "1.7.2" % JOOQ.name,
 	    "org.slf4j" % "jul-to-slf4j" % "1.7.2" % JOOQ.name,
-//      "triplec1988" % "jooq-custom-codegen" % "1.1.0" % JOOQ.name,
 	    "log4j" % "log4j" % "1.2.17" % JOOQ.name)
       }
     },
