@@ -1,7 +1,7 @@
 This is an SBT plugin that provides an interface to the JOOQ code generation tool
 (<http://www.jooq.org>). The plugin is compatible with SBT 0.11.3+ and Scala 2.9.1+.
 
-The current version of the plugin is *1.5*
+The current version of the plugin is *1.6*
 
 
 Quick Start
@@ -172,3 +172,4 @@ History
 * 1.3: Changed default JOOQ version to 3.2.1 (previous default was 2.6.1)
 * 1.4: Changed default JOOQ version to 3.3.1 (previous default was 3.2.1)
 * 1.5: Added `jooqConfigFile` option to allow for handcrafted JOOQ configurations beyond what can be specified in `jooqOptions`
+* 1.6: Merged pull request #14 to support templatization of JOOQ config files -- thanks to [triplec1988](https://github.com/triplec1988) for this enhancement!
