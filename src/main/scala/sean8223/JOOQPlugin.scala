@@ -30,7 +30,7 @@ object JOOQPlugin extends Plugin {
 
   // setting keys
 
-  val jooqOptions = SettingKey[Seq[Tuple2[String, String]]]("jooq-options", "JOOQ options.")
+  val jooqOptions = SettingKey[Seq[(String, String)]]("jooq-options", "JOOQ options.")
 
   val jooqVersion = SettingKey[String]("jooq-version", "JOOQ version.")
 
@@ -88,19 +88,6 @@ object JOOQPlugin extends Plugin {
       }
     },
 
-    libraryDependencies <++= (scalaVersion, jooqVersion) apply {
-      (sv, jv) => { 
-	Seq("org.jooq" % "jooq" % jv % JOOQ.name,
-	    "org.jooq" % "jooq" % jv, // also add this to the project's compile configuration
-	    "org.jooq" % "jooq-meta" % jv % JOOQ.name,
-	    "org.jooq" % "jooq-codegen" % jv % JOOQ.name,
-	    "org.slf4j" % "slf4j-api" % "1.7.2" % JOOQ.name,
-	    "org.slf4j" % "slf4j-log4j12" % "1.7.2" % JOOQ.name,
-	    "org.slf4j" % "jul-to-slf4j" % "1.7.2" % JOOQ.name,
-	    "log4j" % "log4j" % "1.2.17" % JOOQ.name)
-      }
-    },
-
     ivyConfigurations += JOOQ
     
   )
@@ -108,33 +95,33 @@ object JOOQPlugin extends Plugin {
   private def getOrGenerateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]], jooqConfigFile:Option[File], templateValues:Option[()=>Map[String, AnyRef]]) : File = {
 
     (jooqConfigFile, templateValues) match {
-      case (Some(template), Some(values)) => {
+      case (Some(template), Some(values)) =>
         val engine = new Engine
         val renderedConfig  = File.createTempFile("jooq-config", ".xml")
-        renderedConfig.deleteOnExit
+        renderedConfig.deleteOnExit()
         val writer = new PrintWriter(renderedConfig)
         val substitutions = JavaConversions.mapAsJavaMap(values.apply())
         writer.write(engine.transform(IO.read(template), substitutions))
         writer.close()
         renderedConfig
-      }
+
       case _ => jooqConfigFile.getOrElse(generateJooqConfig(log, outputDirectory, options))
     }
   } 
 
-  private def generateJooqConfig(log:Logger, outputDirectory:File, options:Seq[Tuple2[String,String]]) : File = {
+  private def generateJooqConfig(log:Logger, outputDirectory:File, options:Seq[(String, String)]) : File = {
     val tmp = File.createTempFile("jooq-config", ".xml")
-    tmp.deleteOnExit
+    tmp.deleteOnExit()
     val fw = new FileWriter(tmp)
     try {
       val replaced = Seq("generator.target.directory" -> outputDirectory.getAbsolutePath) ++ options.filter { kv => kv._1 != "generator.target.directory" } 
       val xml = replaced.foldLeft(<configuration/>) { 
 	(xml, kv) => xmlify(kv._1.split("\\."), kv._2, xml) 
       }
-      XML.save(tmp.getAbsolutePath, xml, "UTF-8", true)
+      XML.save(tmp.getAbsolutePath, xml, "UTF-8", xmlDecl=true)
     }
     finally {
-      fw.close
+      fw.close()
     }
     log.debug("Wrote JOOQ configuration to " + tmp.getAbsolutePath)
     tmp
@@ -161,7 +148,7 @@ object JOOQPlugin extends Plugin {
     // shunt any messages at warn and higher to stderr, everything else to
     // stdout, thanks to http://stackoverflow.com/questions/8489551/logging-error-to-stderr-and-debug-info-to-stdout-with-log4j
     val tmp = File.createTempFile("log4j", ".xml")
-    tmp.deleteOnExit
+    tmp.deleteOnExit()
     val configuration =
       <log4j:configuration>
     <appender name="stderr" class="org.apache.log4j.ConsoleAppender">
@@ -188,7 +175,7 @@ object JOOQPlugin extends Plugin {
     <appender-ref ref="stdout" />
     </root>
     </log4j:configuration>
-    XML.save(tmp.getAbsolutePath, configuration, "UTF-8", true, DocType("log4j:configuration", SystemID("log4j.dtd"), Nil))
+    XML.save(tmp.getAbsolutePath, configuration, "UTF-8", xmlDecl=true, DocType("log4j:configuration", SystemID("log4j.dtd"), Nil))
     log.debug("Wrote log4j configuration to " + tmp.getAbsolutePath)
     tmp
   }
@@ -215,12 +202,12 @@ object JOOQPlugin extends Plugin {
     log.debug("Using jooq config " + jcf)
     val log4jConfig = generateLog4jConfig(log, logLevel)
     val classpathArgument = generateClasspathArgument(log, dependencyClasspath, jcf)
-    val cmdLine = Seq("java", "-classpath", classpathArgument, "-Dlog4j.configuration=" + log4jConfig.toURL, "org.jooq.util.GenerationTool", "/" + jcf.getName())
+    val cmdLine = Seq("java", "-classpath", classpathArgument, "-Dlog4j.configuration=" + log4jConfig.toURL, "org.jooq.util.GenerationTool", "/" + jcf.getName)
     log.debug("Command line is " + cmdLine.mkString(" "))
     val rc = Process(cmdLine, baseDirectory) ! log
     rc match {
       case 0 => ;
-      case x => error("Failed with return code: " + x)
+      case x => sys.error("Failed with return code: " + x)
     }
     getOutputFiles(outputDirectory)
   }
